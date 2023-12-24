@@ -14,10 +14,10 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("Default"));
 });
 
-builder.Services.AddIdentity<User, UserRole>()
+builder.Services.AddIdentity<User, Role>()
         .AddDefaultTokenProviders();
 builder.Services.AddTransient<IUserStore<User>, UserStore>();
-builder.Services.AddTransient<IRoleStore<UserRole>, RoleStore>();
+builder.Services.AddTransient<IRoleStore<Role>, RoleStore>();
 
 
 /*builder.Services.AddDefaultIdentity<IdentityUser>(

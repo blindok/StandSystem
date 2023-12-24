@@ -8,7 +8,7 @@ namespace StandSystem.IdentityScheme;
 public class User
 {
     [Key, Required]
-    public int Id { get; set; }
+    public Guid Id { get; set; }
 
     [Required, MaxLength(128)]
     public string UserName { get; set; }

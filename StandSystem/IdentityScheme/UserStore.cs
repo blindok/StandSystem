@@ -109,14 +109,17 @@ public class UserStore : IUserStore<User>, IUserPasswordStore<User>
 
     public async Task<User?> FindByIdAsync(string userId, CancellationToken cancellationToken)
     {
-        if (int.TryParse(userId, out int id))
-        {
-            return await _db.Users.FindAsync(id);
-        }
-        else
-        {
-            return await Task.FromResult((User?)null);
-        }
+        cancellationToken.ThrowIfCancellationRequested();
+        return await _db.Users.SingleOrDefaultAsync(u => u.Id.Equals(Guid.Parse(userId)), cancellationToken);
+
+        //if (int.TryParse(userId, out int id))
+        //{
+        //    return await _db.Users.FindAsync(id);
+        //}
+        //else
+        //{
+        //    return await Task.FromResult((User?)null);
+        //}
     }
 
     public Task<User?> FindByNameAsync(string normalizedUserName, CancellationToken cancellationToken)
