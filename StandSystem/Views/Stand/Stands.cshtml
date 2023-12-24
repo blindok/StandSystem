@@ -1,0 +1,13 @@
+﻿@model IEnumerable<StandVM>
+
+@{
+    ViewData["Title"] = "Stands";
+}
+
+@foreach(var s in Model)
+{
+<div>
+    <br />
+    <a class="btn btn-primary" asp-controller="Stand" asp-action="Show" asp-route-url="@s.Url">Стенд: @s.Name</a>
+</div>
+}

@@ -1,0 +1,250 @@
+﻿﻿@{
+    ViewData["Title"] = "Микропроцессорные системы";
+}
+
+<div class="form-group">
+    <label>Выбор устройства</label>
+    <select class="form-control" data-bind="options: devices, optionsText: 'name', optionsValue: 'name', value: device"></select>
+</div>
+
+<div class="stand-container">
+    <div class="row">
+        <div class="col-xs-12">
+            <div class="diods-group">
+                <div class="row">
+                    @for (int k = 0; k < 4; ++k)
+                    {
+                        <div class="card border-1 m-2 col-md-4">
+                            <div class="card-header border-0">
+                                    @("Порт P" + k)
+                            </div>
+                            <div class="input-group">
+
+                                @for (int i = 0; i < 8; ++i)
+                                {
+                                    <div class="input-field">
+                                        <div class="input-name">@("P" + k + "." + i)&nbsp;</div>
+                                        <div class="material-diod glow-success pull-right">
+                                            <input id="@("dP" + k + i + "Switch")" type="checkbox" disabled data-bind="checked: @("dP" + k + i)" />
+                                            <label for="@("dP" + k + i + "Switch")" class="label-warning"></label>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                            <div class="input-group">
+                                @for (int i = 0; i < 8; ++i)
+                                {
+                                    <div class="input-field">
+                                        <div class="input-name">@("P" + k + "." + i)&nbsp;</div>
+                                        <div class="material-switch pull-right">
+                                            <input id="@("tP" + k + i + "Switch")" type="checkbox" data-bind="checked: @("tP" + k + i)" />
+                                            <label for="@("tP" + k + i + "Switch")" class="label-info"></label>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="row">
+        <div class="main-inputs">
+            <div class="input-group">
+                <div class="input-group-header ">
+                    Системные тумблеры
+                </div>
+                <div class="input-field">
+                    <div class="input-name">Установка CLR&nbsp;</div>
+                    <div class="material-switch pull-right">
+                        <input id="clrSwitch" type="checkbox" data-bind="checked: tclr" />
+                        <label for="clrSwitch" class="label-info"></label>
+                    </div>
+                </div>
+                <div class="input-field">
+                    <div class="input-name">Установка CE&nbsp;</div>
+                    <div class="material-switch pull-right">
+                        <input id="ceSwitch" type="checkbox" data-bind="checked: tce" />
+                        <label for="ceSwitch" class="label-info"></label>
+                    </div>
+                </div>
+            </div>
+            <p>To stand: <strong data-bind="text: toStand"></strong></p>
+            <p>From stand: <strong data-bind="text: fromStand"></strong></p>
+        </div>
+    </div>
+    <div class="row">
+        <div class="management-loader">
+            <!-- ko if: file.progress() != 100 -->
+            <progress data-bind="attr: { value: file.progress }" value="0" max="100"></progress>
+            <!-- /ko-->
+            <!-- ko if: file.progress() == 100 -->
+            файл прошивки загружен
+            <!-- /ko-->
+        </div>
+    </div>
+    <!-- /ko-->
+    <input type="file" onchange="handleFileSelect(event)" />
+</div>
+
+@section Scripts {
+    <script type="text/javascript">
+        function ViewModel() {
+            this.bclr = ko.observable(false);
+            this.bclk = ko.observable(false);
+            this.tclr = ko.observable(false);
+            this.tclk = ko.observable(false);
+            this.tce = ko.observable(true);
+            this.device = ko.observable();
+            this.devices = ko.observableArray(null);
+
+            this.file = {
+                isExist: ko.observable(false),
+                source: ko.observable(null),
+                progress: ko.observable(100),
+                name: ko.observable(null)
+            }
+
+            this.fromStand = ko.observable("");
+
+        @for (int k = 0; k < 4; ++k)
+        {
+            @for (int i = 0; i < 8; ++i)
+            {
+                @("this.tP" + k + i + " = ko.observable(false);");
+                @("this.dP" + k + i + " = ko.computed(function () { return isSym(this.fromStand()[" + (k * 8 + (7 - i)) + "]); }, this);");
+            }
+        }
+
+                this.toStand = ko.computed(function () {
+                    return ("" +
+        @for (int k = 0; k < 4; ++k)
+        {
+            @for (int i = 0; i < 8; ++i)
+            {
+                @: + @(" sym(this.tP" + k + (7 - i) + "())")
+            }
+        }
+                        + sym(this.tclr())
+                        + sym(this.tclk())
+                        + sym(this.tce()))
+                }, this);
+        }
+
+        function sym(val) {
+            return val ? "1" : "0";
+        }
+
+        function isSym(val) {
+            return val == '1';
+        }
+
+        function sendAjaxRequest(controller, httpMethod, callback, reqData) {
+            $.ajax("/api/" + controller, { type: httpMethod, success: callback, data: reqData });
+        }
+
+        function getInfo() {
+            sendAjaxRequest(
+                "poll",
+                "GET",
+                function (data) {
+                    if (model.device() != null) {
+                        if (data.data != null) {
+                            while (data.data.length < 64) {
+                                data.data = data.data + '1';
+                            }
+                            model.fromStand(data.data);
+                        }
+                    }
+                    setTimeout(getInfo, 50);
+                },
+                {
+                    deviceName: model.device()
+                }
+            );
+        }
+
+        function handleFileSelect(event) {
+            var files = event.target.files;
+            f = files[0];
+            if (f == null || !f.type.match('image.*'))
+                return;
+            model.file.name(f.name);
+            model.file.source(null);
+            model.file.progress(0);
+            var reader = new FileReader();
+            reader.onload = (function (file) {
+                return function (e) {
+                    model.file.source(e.target.result);
+                    var data = new FormData();
+                    data.append("file", file);
+                    $.ajax({
+                        url: "/api/middleware",
+                        type: "POST",
+                        data: data,
+                        cache: false,
+                        processData: false,
+                        contentType: false,
+                        success: function (response) {
+                            if (response.isSuccess) {
+                                model.file.isExist(true);
+                                model.file.progress(100);
+                            } else {
+                                errorCallback(response.errorMessage);
+                            }
+                        },
+                        xhr: function () {
+                            var xhr = $.ajaxSettings.xhr();
+                            xhr.upload.addEventListener('progress', function (evt) {
+                                if (evt.lengthComputable) {
+                                    var percentComplete = Math.ceil(evt.loaded / evt.total * 100);
+                                    if (percentComplete < 100) {
+                                        model.file.progress(percentComplete);
+                                    }
+                                }
+                            }, false);
+                            return xhr;
+                        },
+                    });
+                };
+            })(f);
+            reader.readAsDataURL(f);
+        }
+
+
+
+        var model;
+        var oldRequest = "0";
+
+        $(document).ready(function () {
+            model = new ViewModel();
+            ko.applyBindings(model);
+
+            getInfo();
+
+            sendAjaxRequest("devices", "GET",
+                function (data) {
+                    model.devices(data);
+                });
+
+            setInterval(function () {
+                if (oldRequest != model.toStand()) {
+                    oldRequest = model.toStand();
+                    if (model.device() != null) {
+                        sendAjaxRequest(
+                            "poll",
+                            "POST",
+                            function () { },
+                            {
+                                name: model.device(),
+                                data: model.toStand()
+                            }
+                        );
+                    }
+                }
+            }, 100);
+            $('.tooltips').tooltip({ delay: { show: 1000, hide: 0 } });
+        });
+    </script>
+}
