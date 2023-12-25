@@ -36,7 +36,8 @@ namespace StandSystem.Migrations
                     FirstName = table.Column<string>(type: "varchar", maxLength: 35, nullable: false),
                     LastName = table.Column<string>(type: "varchar", maxLength: 35, nullable: false),
                     Patronymic = table.Column<string>(type: "varchar", maxLength: 35, nullable: true),
-                    Group = table.Column<string>(type: "varchar", maxLength: 10, nullable: true)
+                    Group = table.Column<string>(type: "varchar", maxLength: 10, nullable: true),
+                    ConcurrencyStamp = table.Column<string>(type: "text", nullable: false)
                 },
                 constraints: table =>
                 {

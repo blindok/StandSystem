@@ -1,12 +1,15 @@
 ﻿using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using StandSystem.DataAccess;
+using System.Data;
+using System.Globalization;
 
 namespace StandSystem.IdentityScheme;
 
-public class UserStore : IUserStore<User>, IUserPasswordStore<User>
+public class UserStore : IUserStore<User>, IUserPasswordStore<User>, IUserRoleStore<User>
 {
     private readonly ApplicationDbContext _db;
+    private bool _disposed;
 
     public UserStore(ApplicationDbContext db)
     {
@@ -21,9 +24,14 @@ public class UserStore : IUserStore<User>, IUserPasswordStore<User>
 
     protected virtual void Dispose(bool disposing)
     {
-        if (disposing)
+        if (!_disposed)
         {
-            _db?.Dispose();
+            if (disposing)
+            {
+                _db?.Dispose();
+            }
+
+            _disposed = true;
         }
     }
 
@@ -39,12 +47,10 @@ public class UserStore : IUserStore<User>, IUserPasswordStore<User>
 
     public async Task SetUserNameAsync(User user, string? userName, CancellationToken cancellationToken)
     {
-        if (userName == null) throw new ArgumentNullException(nameof(userName));
-        await Task.Run(() => user.UserName = userName);
+        if (userName is null) 
+            throw new ArgumentNullException(nameof(userName));
 
-        //user.UserName = userName;
-        //_db.Update(user);
-        //await _db.SaveChangesAsync(cancellationToken);
+        await Task.Run(() => user.UserName = userName);
     }
 
     public Task<string?> GetNormalizedUserNameAsync(User user, CancellationToken cancellationToken)
@@ -54,22 +60,21 @@ public class UserStore : IUserStore<User>, IUserPasswordStore<User>
 
     public async Task SetNormalizedUserNameAsync(User user, string? normalizedName, CancellationToken cancellationToken)
     {
-        if (normalizedName == null) throw new ArgumentNullException(nameof(normalizedName));
-        await Task.Run(() => user.NormalizedUserName = normalizedName.ToUpper());
+        if (normalizedName is null)
+            throw new ArgumentNullException(nameof(normalizedName));
 
-        //user.NormalizedUserName = normalizedName;
-        //_db.Update(user);
-        //await _db.SaveChangesAsync(cancellationToken);
+        await Task.Run(() => user.NormalizedUserName = normalizedName.ToUpper());
     }
 
     public async Task<IdentityResult> CreateAsync(User user, CancellationToken cancellationToken)
     {
-        if (user == null)
+        if (user is null)
         {
             var error = new IdentityError { Code = "1", Description = "User account cannot be null" };
             return await Task.FromResult(IdentityResult.Failed(error));
         }
 
+        user.ConcurrencyStamp = Guid.NewGuid().ToString();
         _db.Add(user);
 
         await _db.SaveChangesAsync(cancellationToken);
@@ -79,12 +84,13 @@ public class UserStore : IUserStore<User>, IUserPasswordStore<User>
 
     public async Task<IdentityResult> UpdateAsync(User user, CancellationToken cancellationToken)
     {
-        if (user == null)
+        if (user is null)
         {
             var error = new IdentityError { Code = "1", Description = "User account cannot be null" };
             return await Task.FromResult(IdentityResult.Failed(error));
         }
 
+        user.ConcurrencyStamp = Guid.NewGuid().ToString();
         _db.Update(user);
 
         await _db.SaveChangesAsync(cancellationToken);
@@ -94,7 +100,7 @@ public class UserStore : IUserStore<User>, IUserPasswordStore<User>
 
     public async Task<IdentityResult> DeleteAsync(User user, CancellationToken cancellationToken)
     {
-        if (user == null)
+        if (user is null)
         {
             var error = new IdentityError { Code = "1", Description = "User account cannot be null" };
             return await Task.FromResult(IdentityResult.Failed(error));
@@ -111,15 +117,6 @@ public class UserStore : IUserStore<User>, IUserPasswordStore<User>
     {
         cancellationToken.ThrowIfCancellationRequested();
         return await _db.Users.SingleOrDefaultAsync(u => u.Id.Equals(Guid.Parse(userId)), cancellationToken);
-
-        //if (int.TryParse(userId, out int id))
-        //{
-        //    return await _db.Users.FindAsync(id);
-        //}
-        //else
-        //{
-        //    return await Task.FromResult((User?)null);
-        //}
     }
 
     public Task<User?> FindByNameAsync(string normalizedUserName, CancellationToken cancellationToken)
@@ -131,7 +128,7 @@ public class UserStore : IUserStore<User>, IUserPasswordStore<User>
 
     public Task SetPasswordHashAsync(User user, string? passwordHash, CancellationToken cancellationToken)
     {
-        if (passwordHash == null) throw new ArgumentNullException(nameof(passwordHash));
+        if (passwordHash is null) throw new ArgumentNullException(nameof(passwordHash));
         user.PasswordHash = passwordHash;
 
         return Task.FromResult(0);
@@ -145,5 +142,93 @@ public class UserStore : IUserStore<User>, IUserPasswordStore<User>
     public Task<bool> HasPasswordAsync(User user, CancellationToken cancellationToken)
     {
         return Task.FromResult(!string.IsNullOrWhiteSpace(user.PasswordHash));
+    }
+
+    public async Task AddToRoleAsync(User user, string roleName, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (user is null) throw new ArgumentNullException(nameof(user));
+        if (roleName is null) throw new ArgumentNullException(nameof(roleName));
+
+        var role = await _db.Roles.SingleOrDefaultAsync(r => r.NormalizedName == roleName.ToUpper(), cancellationToken);
+
+        if (role is null)
+        {
+            throw new InvalidOperationException(String.Format(CultureInfo.CurrentCulture,
+                "Role Not Found", roleName));
+        }
+
+        var ur = new UserRole() { UserId = user.Id, RoleId = role.Id };
+        _db.UserRoles.Add(ur);
+    }
+
+    public async Task RemoveFromRoleAsync(User user, string roleName, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (user is null) throw new ArgumentNullException(nameof(user));
+
+        var role = await _db.Roles.SingleOrDefaultAsync(r => r.NormalizedName == roleName.ToUpper());
+
+        if (role is null)
+        {
+            throw new InvalidOperationException(String.Format(CultureInfo.CurrentCulture,
+                "Role Not Found", roleName));
+        }
+
+        var userRole = await _db.UserRoles.SingleOrDefaultAsync(r => r.UserId == user.Id && r.RoleId == role.Id);
+
+        if (userRole is not null)
+        {
+            _db.UserRoles.Remove(userRole);
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+    }
+
+    public async Task<IList<string>> GetRolesAsync(User user, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (user is null) throw new ArgumentNullException(nameof(user));
+
+        var query = from userRole in _db.UserRoles
+                    where userRole.UserId.Equals(user.Id)
+                    join role in _db.Roles on userRole.RoleId equals role.Id
+                    select role.Name;
+
+        return await query.ToListAsync(cancellationToken);
+    }
+
+    public async Task<bool> IsInRoleAsync(User user, string roleName, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (user is null) throw new ArgumentNullException(nameof(user));
+
+        var role = await _db.Roles.SingleOrDefaultAsync(r => r.NormalizedName == roleName.ToUpper(), cancellationToken);
+
+        if (role is not null)
+        {
+            var userId = user.Id;
+            var roleId = role.Id;
+            return await _db.UserRoles.AnyAsync(ur => ur.RoleId.Equals(roleId) && ur.UserId.Equals(userId), cancellationToken);
+        }
+
+        return false;
+    }
+
+    public async Task<IList<User>> GetUsersInRoleAsync(string roleName, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (roleName is null) throw new ArgumentNullException(nameof(roleName));
+
+        var query = from user in _db.Users
+                    join role in _db.Roles on user.Id equals role.Id
+                    where role.NormalizedName == roleName.ToUpper()
+                    select user;
+
+        return await query.ToListAsync(cancellationToken);
     }
 }

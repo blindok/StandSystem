@@ -2,14 +2,14 @@
 
 public interface ISshKeyValidator
 {
-    bool IsValid(string SshKey);
+    bool IsValid(string SshKey, string ip);
 }
 
 public class SshKeyValidator : ISshKeyValidator
 {
-    public bool IsValid(string SshKey)
+    public bool IsValid(string SshKey, string ip)
     {
-        // logic
+        
         return true;
     }
 }

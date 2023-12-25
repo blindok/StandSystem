@@ -14,9 +14,10 @@ public class ShhKeyAuthorizationFilter : IAuthorizationFilter
 
     public void OnAuthorization(AuthorizationFilterContext context)
     {
-        string apiKey = context.HttpContext.Request.Headers["n"];
+        string? key = context.HttpContext.Request.Headers["Key"];
+        string ip = context.HttpContext.Connection.RemoteIpAddress.ToString();
 
-        if (!_sshKeyValidator.IsValid(apiKey))
+        if (key is null || !_sshKeyValidator.IsValid(key, ip))
         {
             context.Result = new UnauthorizedResult();
         }

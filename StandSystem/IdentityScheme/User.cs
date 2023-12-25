@@ -41,5 +41,8 @@ public class User
     [Column(TypeName = "varchar")]
     public string? Group { get; set; }
 
+    [Required]
+    public string ConcurrencyStamp { get; set; }
+
     public virtual ICollection<UserRole> UserRoles { get; set; }
 }

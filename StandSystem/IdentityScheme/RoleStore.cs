@@ -1,11 +1,10 @@
 ﻿using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Diagnostics;
 using StandSystem.DataAccess;
 
 namespace StandSystem.IdentityScheme;
 
-public class RoleStore : IRoleStore<Role>
+public class RoleStore : IRoleStore<Role>, IQueryableRoleStore<Role>
 {
     private readonly ApplicationDbContext _db;
     private bool _disposed;
@@ -17,15 +16,20 @@ public class RoleStore : IRoleStore<Role>
 
     public void Dispose()
     {
-        _disposed = true;
+        Dispose(true);
+        GC.SuppressFinalize(this);
     }
 
-
-    protected void ThrowIfDisposed()
+    protected virtual void Dispose(bool disposing)
     {
-        if (_disposed)
+        if (!_disposed)
         {
-            throw new ObjectDisposedException(GetType().Name);
+            if (disposing)
+            {
+                _db?.Dispose();
+            }
+
+            _disposed = true;
         }
     }
 
@@ -33,13 +37,13 @@ public class RoleStore : IRoleStore<Role>
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        ThrowIfDisposed();
-
-        if (role == null)
+        if (role is null)
         {
-            throw new ArgumentNullException(nameof(role));
+            var error = new IdentityError { Code = "1", Description = "Role cannot be null" };
+            return await Task.FromResult(IdentityResult.Failed(error));
         }
 
+        role.ConcurrencyStamp = Guid.NewGuid().ToString();
         _db.Roles.Add(role);
         await _db.SaveChangesAsync(cancellationToken);
 
@@ -50,11 +54,10 @@ public class RoleStore : IRoleStore<Role>
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        ThrowIfDisposed();
-
-        if (role == null)
+        if (role is null)
         {
-            throw new ArgumentNullException(nameof(role));
+            var error = new IdentityError { Code = "1", Description = "Role cannot be null" };
+            return await Task.FromResult(IdentityResult.Failed(error));
         }
 
         _db.Roles.Attach(role);
@@ -77,11 +80,10 @@ public class RoleStore : IRoleStore<Role>
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        ThrowIfDisposed();
-
-        if (role == null)
+        if (role is null)
         {
-            throw new ArgumentNullException(nameof(role));
+            var error = new IdentityError { Code = "1", Description = "Role cannot be null" };
+            return await Task.FromResult(IdentityResult.Failed(error));
         }
 
         _db.Roles.Remove(role);
@@ -101,9 +103,8 @@ public class RoleStore : IRoleStore<Role>
     public Task<string> GetRoleIdAsync(Role role, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        ThrowIfDisposed();
 
-        if (role == null)
+        if (role is null)
         {
             throw new ArgumentNullException(nameof(role));
         }
@@ -114,9 +115,8 @@ public class RoleStore : IRoleStore<Role>
     public Task<string?> GetRoleNameAsync(Role role, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        ThrowIfDisposed();
 
-        if (role == null)
+        if (role is null)
         {
             throw new ArgumentNullException(nameof(role));
         }
@@ -127,13 +127,14 @@ public class RoleStore : IRoleStore<Role>
     public Task SetRoleNameAsync(Role role, string? roleName, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (roleName == null) throw new ArgumentNullException(nameof(roleName));
-        ThrowIfDisposed();
 
-        if (role == null)
+        if (roleName is null) throw new ArgumentNullException(nameof(roleName));
+
+        if (role is null)
         {
             throw new ArgumentNullException(nameof(role));
         }
+
         role.Name = roleName;
 
         return Task.CompletedTask;
@@ -142,9 +143,8 @@ public class RoleStore : IRoleStore<Role>
     public Task<string?> GetNormalizedRoleNameAsync(Role role, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        ThrowIfDisposed();
 
-        if (role == null)
+        if (role is null)
         {
             throw new ArgumentNullException(nameof(role));
         }
@@ -155,10 +155,9 @@ public class RoleStore : IRoleStore<Role>
     public Task SetNormalizedRoleNameAsync(Role role, string? normalizedName, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (normalizedName == null) throw new ArgumentNullException(nameof(normalizedName));
-        ThrowIfDisposed();
+        if (normalizedName is null) throw new ArgumentNullException(nameof(normalizedName));
 
-        if (role == null)
+        if (role is null)
         {
             throw new ArgumentNullException(nameof(role));
         }
@@ -170,14 +169,16 @@ public class RoleStore : IRoleStore<Role>
     Task<Role?> IRoleStore<Role>.FindByIdAsync(string roleId, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        ThrowIfDisposed();
+
         return _db.Roles.FirstOrDefaultAsync(u => u.Id.Equals(roleId), cancellationToken);
     }
 
     Task<Role?> IRoleStore<Role>.FindByNameAsync(string normalizedRoleName, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        ThrowIfDisposed();
+
         return _db.Roles.FirstOrDefaultAsync(r => r.NormalizedName == normalizedRoleName, cancellationToken);
     }
+
+    public IQueryable<Role> Roles => _db.Roles.AsQueryable();
 }

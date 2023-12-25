@@ -12,7 +12,7 @@ using StandSystem.DataAccess;
 namespace StandSystem.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20231224023243_InitIdentityTables")]
+    [Migration("20231224094403_InitIdentityTables")]
     partial class InitIdentityTables
     {
         /// <inheritdoc />
@@ -53,6 +53,10 @@ namespace StandSystem.Migrations
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
+
+                    b.Property<string>("ConcurrencyStamp")
+                        .IsRequired()
+                        .HasColumnType("text");
 
                     b.Property<string>("FirstName")
                         .IsRequired()
